@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRX AI Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e293b;
+            color: #e2e8f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            -webkit-app-region: drag; /* Allow dragging window */
+        }
+
+        .chat-header-title h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .chat-header-title span {
+            font-size: 12px;
+            opacity: 0.8;
+            color: white;
+        }
+
+        .chat-header-actions {
+            display: flex;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        .chat-header-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .chat-header-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .chat-message.user {
+            align-self: flex-end;
+            background: #3b82f6;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-message.assistant {
+            align-self: flex-start;
+            background: #334155;
+            color: #e2e8f0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.system {
+            align-self: center;
+            background: #1e293b;
+            color: #94a3b8;
+            font-size: 13px;
+            text-align: center;
+            border: 1px dashed #475569;
+        }
+
+        .chat-message.loading {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .chat-message.loading .dot {
+            width: 8px;
+            height: 8px;
+            background: #64748b;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .chat-message.loading .dot:nth-child(1) { animation-delay: -0.32s; }
+        .chat-message.loading .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .chat-input-container {
+            padding: 16px;
+            background: #0f172a;
+            border-top: 1px solid #334155;
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: #3b82f6;
+        }
+
+        .chat-input::placeholder {
+            color: #64748b;
+        }
+
+        .chat-send-btn {
+            background: #3b82f6;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .chat-send-btn:hover:not(:disabled) {
+            background: #2563eb;
+        }
+
+        .chat-send-btn:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 4px;
+        }
+
+        .lang-btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.7);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .lang-btn.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-header">
+        <div class="chat-header-title">
+            <h3 id="title">AI 투자 어시스턴트</h3>
+            <span id="subtitle">섹터 로테이션 Q&A</span>
+        </div>
+        <div class="chat-header-actions">
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLanguage('ko')">KOR</button>
+                <button class="lang-btn" onclick="setLanguage('en')">ENG</button>
+            </div>
+            <button class="chat-header-btn" onclick="newConversation()" id="newChatBtn">새 대화</button>
+        </div>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+        <div class="chat-message system" id="welcome">안녕하세요! KRX 섹터 로테이션 분석에 대해 질문해주세요.
+
+예시 질문:
+• 오늘 모멘텀 상위 종목은?
+• TIER 1 테마는 무엇인가요?
+• 군집성이 가장 강한 테마는?</div>
+    </div>
+
+    <div class="chat-input-container">
+        <input type="text" class="chat-input" id="chat-input" placeholder="질문을 입력하세요..." />
+        <button class="chat-send-btn" id="chat-send-btn" onclick="sendMessage()">전송</button>
+    </div>
+
+    <script>
+        const API_BASE = 'https://web-production-d07d3.up.railway.app';
+        const STORAGE_KEY = 'krx-chat-popup-conversation-id';
+
+        let currentLang = localStorage.getItem('krx-chat-lang') || 'ko';
+        let conversationId = null;
+        let isLoading = false;
+
+        const translations = {
+            ko: {
+                title: 'AI 투자 어시스턴트',
+                subtitle: '섹터 로테이션 Q&A',
+                placeholder: '질문을 입력하세요...',
+                send: '전송',
+                newChat: '새 대화',
+                welcome: '안녕하세요! KRX 섹터 로테이션 분석에 대해 질문해주세요.\n\n예시 질문:\n• 오늘 모멘텀 상위 종목은?\n• TIER 1 테마는 무엇인가요?\n• 군집성이 가장 강한 테마는?',
+                error: '오류가 발생했습니다. 다시 시도해주세요.'
+            },
+            en: {
+                title: 'AI Investment Assistant',
+                subtitle: 'Sector Rotation Q&A',
+                placeholder: 'Type your question...',
+                send: 'Send',
+                newChat: 'New Chat',
+                welcome: 'Hello! Ask me about KRX Sector Rotation analysis.\n\nExample questions:\n• Which stocks have highest momentum today?\n• What are the TIER 1 themes?\n• Which themes have strongest cohesion?',
+                error: 'An error occurred. Please try again.'
+            }
+        };
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('krx-chat-lang', lang);
+
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === (lang === 'ko' ? 'KOR' : 'ENG'));
+            });
+
+            document.getElementById('title').textContent = translations[lang].title;
+            document.getElementById('subtitle').textContent = translations[lang].subtitle;
+            document.getElementById('chat-input').placeholder = translations[lang].placeholder;
+            document.getElementById('chat-send-btn').textContent = translations[lang].send;
+            document.getElementById('newChatBtn').textContent = translations[lang].newChat;
+        }
+
+        function addMessage(role, content) {
+            const messagesEl = document.getElementById('chat-messages');
+            const msgEl = document.createElement('div');
+            msgEl.className = `chat-message ${role}`;
+            msgEl.textContent = content;
+            messagesEl.appendChild(msgEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            return msgEl;
+        }
+
+        function addLoadingMessage() {
+            const messagesEl = document.getElementById('chat-messages');
+            const msgEl = document.createElement('div');
+            msgEl.className = 'chat-message assistant loading';
+            msgEl.id = 'loading-message';
+            msgEl.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+            messagesEl.appendChild(msgEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function removeLoadingMessage() {
+            const loadingEl = document.getElementById('loading-message');
+            if (loadingEl) loadingEl.remove();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message || isLoading) return;
+
+            isLoading = true;
+            document.getElementById('chat-send-btn').disabled = true;
+
+            addMessage('user', message);
+            input.value = '';
+            addLoadingMessage();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/chat/message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        conversation_id: conversationId,
+                        language: currentLang
+                    })
+                });
+
+                removeLoadingMessage();
+
+                if (!response.ok) throw new Error('API error');
+
+                const data = await response.json();
+                conversationId = data.conversation_id;
+                localStorage.setItem(STORAGE_KEY, conversationId);
+                addMessage('assistant', data.response);
+
+            } catch (error) {
+                removeLoadingMessage();
+                addMessage('system', translations[currentLang].error);
+            } finally {
+                isLoading = false;
+                document.getElementById('chat-send-btn').disabled = false;
+                input.focus();
+            }
+        }
+
+        function newConversation() {
+            conversationId = null;
+            localStorage.removeItem(STORAGE_KEY);
+            const messagesEl = document.getElementById('chat-messages');
+            messagesEl.innerHTML = '';
+            const welcomeEl = document.createElement('div');
+            welcomeEl.className = 'chat-message system';
+            welcomeEl.textContent = translations[currentLang].welcome;
+            messagesEl.appendChild(welcomeEl);
+        }
+
+        // Enter key handler
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !isLoading) sendMessage();
+        });
+
+        // Initialize
+        setLanguage(currentLang);
+        document.getElementById('chat-input').focus();
+    </script>
+</body>
+</html>

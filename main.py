@@ -18,7 +18,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from pathlib import Path
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, selectinload
 from sqlalchemy import String, Text, ForeignKey, select, desc, DateTime
@@ -340,6 +343,9 @@ def generate_title(message: str) -> str:
 # API Endpoints
 # ============================================
 
+STATIC_DIR = Path(__file__).parent / "static"
+
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -349,9 +355,19 @@ async def root():
         "status": "running",
         "endpoints": {
             "chat": "/api/chat/message",
-            "health": "/api/chat/health"
+            "health": "/api/chat/health",
+            "popup": "/popup"
         }
     }
+
+
+@app.get("/popup")
+async def chat_popup():
+    """Serve the popup chat window"""
+    popup_file = STATIC_DIR / "chat-popup.html"
+    if popup_file.exists():
+        return FileResponse(popup_file)
+    return {"error": "Popup file not found"}
 
 
 @app.post("/api/chat/message", response_model=ChatMessageResponse)
